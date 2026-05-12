@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>اتاق امن</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- Login Screen -->
+    <section id="loginScreen" class="card">
+      <h1 class="title">ورود به اتاق گفتگو</h1>
+
+      <div class="form-stack">
+        <label class="field-label" for="roomPassword">رمز اتاق</label>
+        <div class="input-wrap">
+          <input id="roomPassword" class="form-input" type="password" autocomplete="new-password" />
+          <button id="toggleRoomPwd" class="eye-btn" tabindex="-1" aria-label="نمایش رمز">👁</button>
+        </div>
+
+        <label class="field-label" for="username">نام کاربری</label>
+        <input id="username" class="form-input" type="text" autocomplete="username" />
+
+        <label class="field-label" for="personalPassword">رمز شخصی</label>
+        <div class="input-wrap">
+          <input id="personalPassword" class="form-input" type="password" autocomplete="current-password" />
+          <button id="togglePersonalPwd" class="eye-btn" tabindex="-1" aria-label="نمایش رمز">👁</button>
+        </div>
+
+        <div id="loginMessage" class="message-area" aria-live="polite"></div>
+
+        <div class="actions">
+          <button id="selectFolderBtn" class="btn secondary">انتخاب پوشه اشتراکی</button>
+          <button id="loginBtn" class="btn primary">ورود / ثبت‌نام</button>
+        </div>
+
+        <div class="designer-note" id="designerNote" tabindex="0" aria-label="اطلاعات پشتیبانی">
+          <a href="mailto:azadfar2009@gmail.com" class="designer-link">نرم‌افزار ارتباط امن — طراحی و توسعه: محمد آزادفر</a>
+          <span class="designer-tooltip" id="designerTooltip">پشتیبانی: azadfar2009@gmail.com | نسخه 1.2.0.0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chat Screen (initially hidden) -->
+    <section id="chatScreen" class="layout hidden">
+      <header class="chat-header card">
+        <div class="header-left">
+          <span class="status-dot online" title="اتاق امن"></span>
+          <h2 class="room-title">اتاق امن</h2>
+          <span class="sep">—</span>
+          <div class="room-user">کاربر: <strong id="currentUserDisplay"></strong></div>
+        </div>
+        <div class="header-right">
+          <div class="header-actions">
+            <button id="themeToggleBtn" class="btn secondary header-btn" title="تغییر تم">🌓</button>
+            <button id="changePwdBtn" class="btn secondary header-btn">تغییر رمز</button>
+            <button id="logoutBtn" class="btn secondary header-btn">خروج</button>
+          </div>
+        </div>
+      </header>
+
+      <div id="messagesContainer" class="messages card" aria-live="polite"></div>
+
+      <div id="typingIndicator" class="typing-indicator hidden"></div>
+
+      <form id="messageForm" class="message-form card" autocomplete="off">
+        <button id="sendBtn" class="btn primary" type="submit" title="ارسال">ارسال</button>
+
+        <input id="messageInput" class="form-input message-input" type="text" placeholder="پیام خود را بنویسید..." />
+
+        <div class="right-controls">
+          <div class="emoji-wrapper">
+            <button id="emojiBtn" type="button" class="btn secondary small" title="اموجی">😊</button>
+            <div id="emojiPicker" class="emoji-picker hidden" role="listbox" aria-hidden="true"></div>
+          </div>
+          <button id="attachBtn" type="button" class="btn secondary small" title="پیوست">📎</button>
+          <input id="fileInput" type="file" class="hidden" />
+        </div>
+      </form>
+    </section>
+
+    <!-- Admin Modal (hidden) -->
+    <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="modal-backdrop" id="modalBackdrop"></div>
+      <div class="modal-content card admin-modal-fixed-theme" role="document">
+        <button id="closeAdminModal" class="close-btn" aria-label="بستن">×</button>
+
+        <h3>پنل مدیریت</h3>
+
+        <div id="adminLoginArea">
+          <h4>ورود به مدیریت</h4>
+          <div class="form-row">
+            <label for="adminPassword">رمز مدیریت</label>
+            <input id="adminPassword" class="form-input" type="password" />
+          </div>
+          <div class="actions">
+            <button id="adminLoginBtn" class="btn primary">ورود به مدیریت</button>
+          </div>
+          <div id="adminLoginMessage" class="message-area"></div>
+        </div>
+
+        <div id="adminPanel" class="hidden">
+          <section class="admin-section">
+            <h4>کاربران در انتظار تأیید</h4>
+            <div id="pendingUsersList" class="list"></div>
+          </section>
+
+          <section class="admin-section">
+            <h4>کاربران تأیید شده</h4>
+            <div id="approvedUsersList" class="list"></div>
+          </section>
+
+          <section class="admin-section">
+            <h4>عملیات</h4>
+            <div class="admin-actions-top">
+              <button id="changeAdminPwdBtn" class="btn admin-action-btn">تغییر رمز پنل</button>
+              <button id="deleteRoomBtn" class="btn danger admin-action-btn">حذف این اتاق</button>
+              <button id="backupBtn" class="btn secondary admin-action-btn">بکاپ اطلاعات</button>
+            </div>
+            <div id="adminActionMessage" class="message-area"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+/* chat.html – نسخه 1.2.0.0
+   تغییرات نسبت به 1.1.1.0:
+   - کش کلید AES در IndexedDB برای حذف PBKDF2 تکراری
+   - رندر تکه‌ای پیام‌ها (۲۰ تایی) با requestAnimationFrame
+   - کش پیشرفته readAndDecryptCurrent (بازگشت فوری در صورت عدم تغییر فایل)
+   - صف ارسال محلی (outbox) با تلاش مجدد خودکار
+   - نوتیفیکیشن مرورگر فقط وقتی کاربر در صفحه چت نیست
+   - نشانگر تایپ (typing indicator) با debounce
+   - بکاپ فایل chatroom.dat فقط در پنل مدیریت
+   - اصلاح کامل باگ غیرفعال‌سازی کاربر
+   - فونت B Nazanin سراسری، سایز پایه 16px
+   - ارتفاع یکسان دکمه‌ها
+*/
+
+/* ---------- ثابت‌ها ---------- */
+const CHAT_FILENAME = 'chatroom.dat';
+const SALT_SEPARATOR = '|';
+const PBKDF2_ITER = 100000;
+const AES_ALGO = { name: 'AES-GCM', length: 256 };
+const MESSAGE_RETENTION_MS = 24 * 60 * 60 * 1000;
+const POLL_INTERVAL_MS = 500;
+const MAX_WRITE_RETRIES = 5;
+const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+const TYPING_DEBOUNCE_MS = 2000;
+const TYPING_TIMEOUT_MS = 3000;
+
+/* IndexedDB */
+const IDB_DB = 'chat_room_db';
+const IDB_STORE = 'handles';
+const IDB_KEY_HANDLE = 'shared_folder_handle';
+const IDB_KEY_CACHE = 'roomKeyCache';
+const SESSION_KEY = 'chat_session_v3';
+
+/* DOM */
+const loginScreen = document.getElementById('loginScreen');
+const chatScreen = document.getElementById('chatScreen');
+const selectFolderBtn = document.getElementById('selectFolderBtn');
+const loginBtn = document.getElementById('loginBtn');
+const loginMessage = document.getElementById('loginMessage');
+const roomPasswordInput = document.getElementById('roomPassword');
+const usernameInput = document.getElementById('username');
+const personalPasswordInput = document.getElementById('personalPassword');
+const toggleRoomPwd = document.getElementById('toggleRoomPwd');
+const togglePersonalPwd = document.getElementById('togglePersonalPwd');
+
+const messagesContainer = document.getElementById('messagesContainer');
+const typingIndicator = document.getElementById('typingIndicator');
+const messageForm = document.getElementById('messageForm');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const emojiBtn = document.getElementById('emojiBtn');
+const emojiPicker = document.getElementById('emojiPicker');
+const attachBtn = document.getElementById('attachBtn');
+const fileInput = document.getElementById('fileInput');
+const changePwdBtn = document.getElementById('changePwdBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+const currentUserDisplay = document.getElementById('currentUserDisplay');
+
+const adminModal = document.getElementById('adminModal');
+const modalBackdrop = document.getElementById('modalBackdrop');
+const closeAdminModal = document.getElementById('closeAdminModal');
+const adminLoginArea = document.getElementById('adminLoginArea');
+const adminPanel = document.getElementById('adminPanel');
+const adminPasswordInput = document.getElementById('adminPassword');
+const adminLoginBtn = document.getElementById('adminLoginBtn');
+const adminLoginMessage = document.getElementById('adminLoginMessage');
+const pendingUsersList = document.getElementById('pendingUsersList');
+const approvedUsersList = document.getElementById('approvedUsersList');
+const deleteRoomBtn = document.getElementById('deleteRoomBtn');
+const changeAdminPwdBtn = document.getElementById('changeAdminPwdBtn');
+const backupBtn = document.getElementById('backupBtn');
+const adminActionMessage = document.getElementById('adminActionMessage');
+
+const designerNote = document.getElementById('designerNote');
+const designerTooltip = document.getElementById('designerTooltip');
+
+/* وضعیت */
+let directoryHandle = null;
+let currentRoomPassword = '';
+let currentUsername = '';
+let currentPersonalPassword = '';
+let currentData = null;
+let currentKey = null;
+let currentSalt = null;
+let pollTimer = null;
+let lastKnownVersion = null;
+let adminAuthenticated = false;
+let refreshInProgress = false;
+let lastFileModified = null;
+let outbox = [];
+let typingTimer = null;
+let lastTypingUpdate = 0;
+
+/* ---------- IndexedDB helpers ---------- */
+function openIdb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveDirectoryHandleToIdb(handle) {
+  const db = await openIdb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(handle, IDB_KEY_HANDLE);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getDirectoryHandleFromIdb() {
+  const db = await openIdb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(IDB_KEY_HANDLE);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/* کش کلید اتاق */
+async function saveRoomKeyCache(roomPasswordHash, keyRaw) {
+  const db = await openIdb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put({ hash: roomPasswordHash, key: keyRaw }, IDB_KEY_CACHE);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getRoomKeyCache() {
+  const db = await openIdb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(IDB_KEY_CACHE);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function clearRoomKeyCache() {
+  const db = await openIdb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(IDB_KEY_CACHE);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/* ---------- خطاها ---------- */
+const ERROR_MESSAGES = {
+  ERR_NO_DIR: 'پوشهٔ اشتراکی انتخاب نشده است. لطفاً روی «انتخاب پوشه اشتراکی» کلیک کنید.',
+  ERR_PERMISSION_DENIED: 'دسترسی به پوشه داده نشد. لطفاً مجوز خواندن/نوشتن را تأیید کنید.',
+  ERR_DIR_REVOKED: 'مجوز پوشه لغو شده است. لطفاً پوشه را دوباره انتخاب کنید.',
+  ERR_FILE_NOT_FOUND: 'فایل داده پیدا نشد. اگر این اولین اجراست، با وارد کردن رمز جدید اتاق ایجاد خواهد شد.',
+  ERR_INVALID_FORMAT: 'فرمت فایل داده نامعتبر است.',
+  ERR_DECRYPT_FAIL: 'رمز اتاق نادرست است یا فایل با این رمز باز نمی‌شود.',
+  ERR_SAVE_RETRIES: 'ذخیره‌سازی با تداخل مواجه شد. لطفاً دوباره تلاش کنید.',
+  ERR_FIELDS_REQUIRED: 'لطفاً همهٔ فیلدها را پر کنید.',
+  ERR_USERNAME_INVALID: 'نام کاربری نامعتبر است. نام کاربری نباید شامل فاصله باشد.',
+  ERR_USER_INACTIVE: 'حساب شما توسط مدیر غیرفعال شده است.',
+  ERR_USER_NOT_APPROVED: 'حساب شما در انتظار تأیید مدیر است.',
+  ERR_AUTH_FAIL: 'نام کاربری یا رمز شخصی نادرست است.',
+  ERR_SEND_FAIL: 'ارسال پیام ناموفق بود. لطفاً دوباره تلاش کنید.',
+  ERR_UPLOAD_TOO_LARGE: `فایل بزرگ است. حداکثر اندازه مجاز: ${Math.round(UPLOAD_MAX_BYTES/1024/1024)} مگابایت.`,
+  ERR_UPLOAD_FAIL: 'آپلود فایل ناموفق بود. دوباره تلاش کنید.',
+  ERR_DOWNLOAD_FAIL: 'دانلود فایل ناموفق بود.',
+  ERR_ADMIN_AUTH: 'رمز مدیریت نادرست است.',
+  ERR_UNKNOWN: 'خطای نامشخص رخ داد. لطفاً صفحه را رفرش کنید یا دوباره تلاش کنید.',
+  ERR_LOGIN_FIRST: 'برای ورود به پنل مدیریت، ابتدا باید وارد اتاق شوید.',
+  INFO_ADMIN_SET: 'رمز مدیریت با موفقیت تنظیم شد.',
+  INFO_USER_APPROVED: 'کاربر تأیید شد.',
+  INFO_USER_TOGGLED: 'وضعیت کاربر به‌روزرسانی شد.',
+  INFO_ROOM_DELETED: 'اتاق حذف شد. کاربران حفظ شدند؛ با رمز جدید وارد شوید.'
+};
+
+function showLoginMessage(text, type = 'info') {
+  loginMessage.textContent = text;
+  loginMessage.className = 'message-area ' + type;
+}
+function showAdminMessage(text, type = 'info') {
+  adminActionMessage.textContent = text;
+  adminActionMessage.className = 'message-area ' + type;
+}
+
+/* ---------- Web Crypto ---------- */
+function str2ab(str) { return new TextEncoder().encode(str); }
+function ab2base64(buf) {
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function base642ab(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+function ab2hex(buf) {
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function sha256Hex(text) {
+  const digest = await crypto.subtle.digest('SHA-256', str2ab(text));
+  return ab2hex(digest);
+}
+async function deriveKeyFromPassword(password, saltBase64) {
+  const salt = base642ab(saltBase64);
+  const baseKey = await crypto.subtle.importKey('raw', str2ab(password), { name: 'PBKDF2' }, false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: PBKDF2_ITER, hash: 'SHA-256' }, baseKey, AES_ALGO, false, ['encrypt', 'decrypt']);
+}
+async function encryptJson(key, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plain = str2ab(JSON.stringify(obj));
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain);
+  const combined = new Uint8Array(iv.byteLength + cipher.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(cipher), iv.byteLength);
+  return ab2base64(combined.buffer);
+}
+async function decryptJson(key, base64Combined) {
+  const combined = new Uint8Array(base642ab(base64Combined));
+  const iv = combined.slice(0, 12);
+  const cipher = combined.slice(12);
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
+  return JSON.parse(new TextDecoder().decode(plainBuf));
+}
+
+/* ---------- File System Access ---------- */
+async function readChatFileRaw() {
+  if (!directoryHandle) throw new Error('ERR_NO_DIR');
+  try {
+    const fh = await directoryHandle.getFileHandle(CHAT_FILENAME, { create: false });
+    const file = await fh.getFile();
+    return { content: await file.text(), lastModified: file.lastModified };
+  } catch (err) {
+    if (err.name === 'NotFoundError' || err.message.includes('NotFoundError')) return null;
+    throw err;
+  }
+}
+
+async function writeChatFileRaw(content) {
+  if (!directoryHandle) throw new Error('ERR_NO_DIR');
+  const fh = await directoryHandle.getFileHandle(CHAT_FILENAME, { create: true });
+  const writable = await fh.createWritable();
+  await writable.write(content);
+  await writable.close();
+}
+
+async function ensureUploadsDir() {
+  if (!directoryHandle) throw new Error('ERR_NO_DIR');
+  return directoryHandle.getDirectoryHandle('uploads', { create: true });
+}
+
+async function removeUploadsDir() {
+  if (!directoryHandle) return;
+  try {
+    if (directoryHandle.removeEntry) {
+      await directoryHandle.removeEntry('uploads', { recursive: true }).catch(()=>{});
+    } else {
+      const dir = await directoryHandle.getDirectoryHandle('uploads', { create: false }).catch(()=>null);
+      if (!dir) return;
+      for await (const [name, handle] of dir.entries()) {
+        try {
+          if (handle.kind === 'file') await dir.removeEntry(name);
+          else if (handle.kind === 'directory' && dir.removeEntry) await dir.removeEntry(name, { recursive: true });
+        } catch(e){}
+      }
+    }
+  } catch(e){}
+}
+
+/* بارگذاری داده با کش کلید */
+async function loadDataWithPassword(roomPassword) {
+  const pwdHash = await sha256Hex(roomPassword);
+  let key = null;
+
+  const cached = await getRoomKeyCache();
+  if (cached && cached.hash === pwdHash) {
+    key = await crypto.subtle.importKey('raw', base642ab(cached.key), AES_ALGO, false, ['encrypt', 'decrypt']);
+  }
+
+  let raw = await readChatFileRaw();
+  if (!raw) {
+    const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+    const saltBase64 = ab2base64(saltBytes.buffer);
+    const initial = { version: 1, adminHash: null, users: {}, messages: [], creator: null, roomResetAt: null, typing: {} };
+    if (!key) key = await deriveKeyFromPassword(roomPassword, saltBase64);
+    const enc = await encryptJson(key, initial);
+    const combined = saltBase64 + SALT_SEPARATOR + enc;
+    await writeChatFileRaw(combined);
+    currentSalt = saltBase64;
+    currentKey = key;
+    const rawKey = ab2base64(await crypto.subtle.exportKey('raw', key));
+    await saveRoomKeyCache(pwdHash, rawKey);
+    return { data: initial, key, saltBase64 };
+  }
+
+  const { content } = raw;
+  const sepIdx = content.indexOf(SALT_SEPARATOR);
+  if (sepIdx < 0) throw new Error('ERR_INVALID_FORMAT');
+  const saltBase64 = content.slice(0, sepIdx);
+  const enc = content.slice(sepIdx + 1);
+
+  if (!key) key = await deriveKeyFromPassword(roomPassword, saltBase64);
+  const data = await decryptJson(key, enc);
+  currentSalt = saltBase64;
+  currentKey = key;
+
+  const rawKey = ab2base64(await crypto.subtle.exportKey('raw', key));
+  await saveRoomKeyCache(pwdHash, rawKey);
+  return { data, key, saltBase64 };
+}
+
+/* ذخیره با retry */
+async function saveDataWithRetries(expectedVersion, modifyCallback) {
+  for (let attempt = 0; attempt < MAX_WRITE_RETRIES; attempt++) {
+    const raw = await readChatFileRaw();
+    if (!raw) throw new Error('ERR_FILE_NOT_FOUND');
+    const { content } = raw;
+    const sepIdx = content.indexOf(SALT_SEPARATOR);
+    if (sepIdx < 0) throw new Error('ERR_INVALID_FORMAT');
+    const saltBase64 = content.slice(0, sepIdx);
+    const enc = content.slice(sepIdx + 1);
+    let key;
+    if (saltBase64 === currentSalt && currentKey) {
+      key = currentKey;
+    } else {
+      key = await deriveKeyFromPassword(currentRoomPassword, saltBase64);
+      currentSalt = saltBase64;
+      currentKey = key;
+    }
+    const data = await decryptJson(key, enc);
+    const now = Date.now();
+    data.messages = (data.messages || []).filter(m => (now - m.timestamp) <= MESSAGE_RETENTION_MS);
+    data.typing = data.typing || {};
+
+    if (data.version !== expectedVersion) {
+      expectedVersion = data.version;
+      if (attempt < MAX_WRITE_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, 20 * (attempt + 1) + Math.random() * 30));
+        continue;
+      }
+      throw new Error('ERR_SAVE_RETRIES');
+    }
+
+    modifyCallback(data);
+    data.version = (data.version || 0) + 1;
+
+    const newEnc = await encryptJson(key, data);
+    const combined = saltBase64 + SALT_SEPARATOR + newEnc;
+    await writeChatFileRaw(combined);
+    return data;
+  }
+  throw new Error('ERR_SAVE_RETRIES');
+}
+
+async function readAndDecryptCurrent() {
+  const raw = await readChatFileRaw();
+  if (!raw) throw new Error('ERR_FILE_NOT_FOUND');
+  const { content, lastModified } = raw;
+  if (lastModified === lastFileModified && currentData) {
+    return { data: currentData, key: currentKey, saltBase64: currentSalt };
+  }
+  lastFileModified = lastModified;
+  const sepIdx = content.indexOf(SALT_SEPARATOR);
+  if (sepIdx < 0) throw new Error('ERR_INVALID_FORMAT');
+  const saltBase64 = content.slice(0, sepIdx);
+  const enc = content.slice(sepIdx + 1);
+  let key;
+  if (saltBase64 === currentSalt && currentKey) {
+    key = currentKey;
+  } else {
+    key = await deriveKeyFromPassword(currentRoomPassword, saltBase64);
+    currentSalt = saltBase64;
+    currentKey = key;
+  }
+  const data = await decryptJson(key, enc);
+  data.messages = (data.messages || []).filter(m => (Date.now() - m.timestamp) <= MESSAGE_RETENTION_MS);
+  data.typing = data.typing || {};
+  return { data, key, saltBase64 };
+}
+
+async function ensureDirectoryHandle() {
+  if (directoryHandle) {
+    try {
+      if (typeof directoryHandle.queryPermission === 'function') {
+        if ((await directoryHandle.queryPermission({ mode: 'readwrite' })) === 'granted') return;
+      } else if (typeof directoryHandle.requestPermission !== 'function') {
+        return;
+      }
+    } catch(e){}
+  }
+  const saved = await getDirectoryHandleFromIdb();
+  if (saved) {
+    try {
+      if (typeof saved.queryPermission === 'function') {
+        if ((await saved.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+          const perm = await saved.requestPermission({ mode: 'readwrite' });
+          if (perm !== 'granted') throw new Error('ERR_PERMISSION_DENIED');
+        }
+      }
+      directoryHandle = saved;
+      return;
+    } catch(e) { throw new Error('ERR_PERMISSION_DENIED'); }
+  }
+  throw new Error('ERR_NO_DIR');
+}
+
+function validateUsernameRaw(name) {
+  if (!name) return { ok: false, msg: ERROR_MESSAGES.ERR_FIELDS_REQUIRED };
+  const trimmed = name.trim();
+  if (/\s/.test(trimmed)) return { ok: false, msg: ERROR_MESSAGES.ERR_USERNAME_INVALID };
+  return { ok: true, name: trimmed.toLowerCase() };
+}
+
+function performLogout(message = 'شما خارج شدید.') {
+  clearSession();
+  currentUsername = '';
+  currentPersonalPassword = '';
+  currentRoomPassword = '';
+  currentSalt = null;
+  currentKey = null;
+  currentData = null;
+  lastFileModified = null;
+  outbox = [];
+  typingIndicator.classList.add('hidden');
+  if (pollTimer) clearInterval(pollTimer);
+  chatScreen.classList.add('hidden');
+  loginScreen.classList.remove('hidden');
+  showLoginMessage(message, 'info');
+  adminAuthenticated = false;
+  if (!adminModal.classList.contains('hidden')) {
+    adminModal.classList.add('hidden');
+    adminModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+/* ---------- ورود ---------- */
+async function handleLogin() {
+  showLoginMessage('', 'info');
+  try {
+    await ensureDirectoryHandle().catch(()=>{ showLoginMessage(ERROR_MESSAGES.ERR_NO_DIR, 'error'); throw new Error('STOP'); });
+
+    const roomPassword = roomPasswordInput.value;
+    const usernameRaw = usernameInput.value;
+    const personalPassword = personalPasswordInput.value;
+
+    if (!roomPassword || !usernameRaw || !personalPassword) { showLoginMessage(ERROR_MESSAGES.ERR_FIELDS_REQUIRED, 'error'); return; }
+
+    const v = validateUsernameRaw(usernameRaw);
+    if (!v.ok) { showLoginMessage(v.msg, 'error'); return; }
+    const username = v.name;
+
+    let loaded;
+    try { loaded = await loadDataWithPassword(roomPassword); } catch(e) {
+      showLoginMessage(ERROR_MESSAGES.ERR_DECRYPT_FAIL, 'error');
+      return;
+    }
+
+    currentRoomPassword = roomPassword;
+    currentKey = loaded.key;
+    currentData = loaded.data;
+    currentSalt = loaded.saltBase64;
+
+    if (currentData.roomResetAt) {
+      showLoginMessage('اتاق در حال بازنشانی است. لطفاً منتظر بمانید.', 'info');
+      return;
+    }
+
+    const now = Date.now();
+    currentData.messages = (currentData.messages || []).filter(m => (now - m.timestamp) <= MESSAGE_RETENTION_MS);
+
+    const userEntry = currentData.users[username];
+    const isFirstUser = Object.keys(currentData.users || {}).length === 0;
+
+    if (isFirstUser) {
+      const userHash = await sha256Hex(username + ':' + personalPassword);
+      currentData.users[username] = { hash: userHash, approved: true, active: true, registeredAt: Date.now(), theme: 'light' };
+      currentData.creator = username;
+      currentData.version = (currentData.version || 0) + 1;
+      const raw = await readChatFileRaw();
+      const sepIdx = raw.content.indexOf(SALT_SEPARATOR);
+      const saltBase64 = raw.content.slice(0, sepIdx);
+      const enc = await encryptJson(currentKey, currentData);
+      await writeChatFileRaw(saltBase64 + SALT_SEPARATOR + enc);
+
+      currentUsername = username;
+      currentPersonalPassword = personalPassword;
+      currentUserDisplay.textContent = currentUsername;
+      applyUserTheme(currentData.users[username].theme);
+      showLoginMessage('اتاق جدید ایجاد شد و شما به‌عنوان اولین کاربر وارد شدید.', 'success');
+      saveSession();
+      openChatScreen();
+      return;
+    }
+
+    if (!userEntry) {
+      const userHash = await sha256Hex(username + ':' + personalPassword);
+      const newUser = { hash: userHash, approved: false, active: true, registeredAt: Date.now(), theme: 'light' };
+      const saved = await saveDataWithRetries(currentData.version || 0, d => { d.users[username] = newUser; });
+      currentData = saved;
+      showLoginMessage('ثبت‌نام انجام شد. منتظر تأیید مدیر باشید.', 'info');
+      return;
+    }
+
+    if (userEntry.active === false) { showLoginMessage(ERROR_MESSAGES.ERR_USER_INACTIVE, 'error'); return; }
+
+    const expectedHash = userEntry.hash;
+    const providedHash = await sha256Hex(username + ':' + personalPassword);
+    if (expectedHash !== providedHash) { showLoginMessage(ERROR_MESSAGES.ERR_AUTH_FAIL, 'error'); return; }
+    if (!userEntry.approved) { showLoginMessage(ERROR_MESSAGES.ERR_USER_NOT_APPROVED, 'info'); return; }
+
+    currentUsername = username;
+    currentPersonalPassword = personalPassword;
+    currentUserDisplay.textContent = currentUsername;
+    applyUserTheme(userEntry.theme || 'light');
+    showLoginMessage('ورود موفقیت‌آمیز بود.', 'success');
+    saveSession();
+    openChatScreen();
+  } catch(e) { if (e.message !== 'STOP') { console.error(e); showLoginMessage(ERROR_MESSAGES.ERR_UNKNOWN, 'error'); } }
+}
+
+function applyUserTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+/* ---------- نمایش پیام‌ها (تکه‌ای) ---------- */
+function renderMessages(messages) {
+  messagesContainer.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  const list = messages || [];
+  const BATCH = 20;
+  let i = 0;
+
+  function addBatch() {
+    const end = Math.min(i + BATCH, list.length);
+    for (; i < end; i++) {
+      const msg = list[i];
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble ' + (msg.user === currentUsername ? 'mine' : 'other');
+      const meta = document.createElement('div');
+      meta.className = 'message-meta';
+      meta.textContent = `${msg.user} — ${new Date(msg.timestamp).toLocaleString('fa-IR')}`;
+      const content = document.createElement('div');
+      content.className = 'message-text';
+
+      if (msg.type === 'file') {
+        const link = document.createElement('a');
+        link.href = '#';
+        link.textContent = msg.name + ' (فایل)';
+        link.onclick = async (e) => {
+          e.preventDefault();
+          try { await downloadFile(msg.storedName, msg.name); } catch(e) { alert(ERROR_MESSAGES.ERR_DOWNLOAD_FAIL); }
+        };
+        content.appendChild(link);
+      } else {
+        content.textContent = msg.text;
+      }
+      bubble.appendChild(meta);
+      bubble.appendChild(content);
+      frag.appendChild(bubble);
+    }
+    messagesContainer.appendChild(frag);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (i < list.length) requestAnimationFrame(addBatch);
+  }
+  requestAnimationFrame(addBatch);
+}
+
+/* کشیدن صف ارسال */
+async function processOutbox() {
+  if (!currentData || !currentUsername) return;
+  const ids = new Set((currentData.messages || []).map(m => m.localId).filter(Boolean));
+  for (const item of outbox.slice()) {
+    if (!ids.has(item.localId)) {
+      await sendMessage(item.text, item.localId);
+      if (currentData && currentData.messages.some(m => m.localId === item.localId)) {
+        outbox = outbox.filter(o => o.localId !== item.localId);
+      }
+    } else {
+      outbox = outbox.filter(o => o.localId !== item.localId);
+    }
+  }
+}
+
+async function refreshDataAndUI() {
+  if (refreshInProgress) return;
+  refreshInProgress = true;
+  try {
+    const { data } = await readAndDecryptCurrent();
+    currentData = data;
+    lastKnownVersion = data.version;
+
+    if (currentUsername && data.users && data.users[currentUsername] && data.users[currentUsername].active === false) {
+      performLogout('حساب شما توسط مدیر غیرفعال شده است.');
+      refreshInProgress = false;
+      return;
+    }
+
+    renderMessages(data.messages || []);
+    updateTypingIndicator(data.typing || {});
+    if (adminAuthenticated) renderAdminLists();
+
+    // نوتیفیکیشن برای پیام جدید فقط وقتی صفحه مخفی باشد
+    if (document.hidden && lastKnownVersion !== null) {
+      const unread = (data.messages || []).filter(m => m.user !== currentUsername).slice(-1);
+      if (unread.length && Notification.permission === 'granted') {
+        new Notification(unread[0].user, { body: unread[0].text, icon: 'data:image/svg+xml,...' });
+      }
+    }
+
+    await processOutbox();
+  } catch(e) {
+    if (e.message === 'ERR_DECRYPT_FAIL' || e.message === 'ERR_INVALID_FORMAT' || e.message === 'ERR_FILE_NOT_FOUND') {
+      performLogout('اتاق در دسترس نیست یا رمز تغییر کرده است. لطفاً دوباره وارد شوید.');
+    }
+  } finally {
+    refreshInProgress = false;
+  }
+}
+
+function openChatScreen() {
+  loginScreen.classList.add('hidden');
+  chatScreen.classList.remove('hidden');
+  refreshDataAndUI();
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(refreshDataAndUI, POLL_INTERVAL_MS);
+  setTimeout(() => messageInput.focus(), 200);
+  if (Notification.permission === 'default') Notification.requestPermission();
+}
+
+/* ---------- ارسال پیام ---------- */
+async function sendMessage(text, localId = null) {
+  if (!text || !text.trim()) return;
+  const trimmed = text.trim();
+  const messageId = localId || (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2, 9));
+  try {
+    const saved = await saveDataWithRetries(lastKnownVersion || (currentData.version || 0), (data) => {
+      data.messages = (data.messages || []).filter(m => (Date.now() - m.timestamp) <= MESSAGE_RETENTION_MS);
+      data.messages.push({ localId: messageId, user: currentUsername, text: trimmed, timestamp: Date.now(), type: 'text' });
+    });
+    currentData = saved;
+    lastKnownVersion = saved.version;
+    renderMessages(saved.messages || []);
+    messageInput.value = '';
+    return saved;
+  } catch(e) {
+    if (!localId) {
+      outbox.push({ localId: messageId, text: trimmed });
+    }
+    alert(ERROR_MESSAGES.ERR_SEND_FAIL);
+  }
+}
+
+/* ---------- تایپ ---------- */
+async function updateTyping() {
+  if (!currentUsername || !currentData) return;
+  const now = Date.now();
+  if (now - lastTypingUpdate < TYPING_DEBOUNCE_MS) return;
+  lastTypingUpdate = now;
+  try {
+    const saved = await saveDataWithRetries(lastKnownVersion || (currentData.version || 0), (data) => {
+      data.typing = data.typing || {};
+      data.typing[currentUsername] = now;
+    });
+    currentData = saved;
+    lastKnownVersion = saved.version;
+  } catch(e) {}
+}
+
+messageInput.addEventListener('input', () => {
+  updateTyping();
+  if (typingTimer) clearTimeout(typingTimer);
+  typingTimer = setTimeout(updateTyping, TYPING_DEBOUNCE_MS);
+});
+
+function updateTypingIndicator(typing) {
+  const now = Date.now();
+  const typers = Object.entries(typing).filter(([user, ts]) => user !== currentUsername && (now - ts) < TYPING_TIMEOUT_MS).map(([user]) => user);
+  if (typers.length) {
+    typingIndicator.textContent = typers.join('، ') + ' در حال تایپ...';
+    typingIndicator.classList.remove('hidden');
+  } else {
+    typingIndicator.classList.add('hidden');
+  }
+}
+
+/* ---------- فایل ---------- */
+async function uploadFile(file) {
+  if (!directoryHandle) { alert(ERROR_MESSAGES.ERR_NO_DIR); return; }
+  if (file.size > UPLOAD_MAX_BYTES) { alert(ERROR_MESSAGES.ERR_UPLOAD_TOO_LARGE); return; }
+  try {
+    const uploads = await ensureUploadsDir();
+    const safeName = file.name.replace(/[\\/:\*\?"<>\|]/g, '_');
+    const storedName = `${Date.now()}__${currentUsername}__${safeName}`;
+    const fh = await uploads.getFileHandle(storedName, { create: true });
+    const w = await fh.createWritable();
+    await w.write(file);
+    await w.close();
+
+    const saved = await saveDataWithRetries(lastKnownVersion || (currentData.version || 0), (data) => {
+      data.messages.push({ user: currentUsername, type: 'file', name: file.name, storedName, timestamp: Date.now() });
+    });
+    currentData = saved;
+    lastKnownVersion = saved.version;
+    renderMessages(saved.messages || []);
+    alert('فایل با موفقیت آپلود شد.');
+  } catch(e) { alert(ERROR_MESSAGES.ERR_UPLOAD_FAIL); }
+}
+
+async function downloadFile(storedName, originalName) {
+  if (!directoryHandle) throw new Error('ERR_NO_DIR');
+  const uploads = await directoryHandle.getDirectoryHandle('uploads', { create: false });
+  const fh = await uploads.getFileHandle(storedName, { create: false });
+  const file = await fh.getFile();
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = originalName || file.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- پنل مدیریت ---------- */
+function openAdminModal() {
+  if (!currentRoomPassword) { showLoginMessage(ERROR_MESSAGES.ERR_LOGIN_FIRST, 'error'); return; }
+  adminModal.classList.remove('hidden');
+  adminModal.setAttribute('aria-hidden', 'false');
+  adminPasswordInput.value = '';
+  adminLoginMessage.textContent = '';
+  adminActionMessage.textContent = '';
+  adminLoginArea.classList.remove('hidden');
+  adminPanel.classList.add('hidden');
+  adminAuthenticated = false;
+  setTimeout(() => adminPasswordInput.focus(), 120);
+}
+
+function closeAdminModalFunc() {
+  adminModal.classList.add('hidden');
+  adminModal.setAttribute('aria-hidden', 'true');
+  adminAuthenticated = false;
+  adminActionMessage.textContent = '';
+}
+
+async function withWaitCursor(fn) {
+  document.body.style.cursor = 'wait';
+  try { await fn(); } finally { document.body.style.cursor = ''; }
+}
+
+function renderAdminLists() {
+  pendingUsersList.innerHTML = '';
+  approvedUsersList.innerHTML = '';
+  const users = currentData.users || {};
+  Object.keys(users).forEach(username => {
+    const u = users[username];
+    const row = document.createElement('div');
+    row.className = 'user-row';
+    const left = document.createElement('div');
+    left.className = 'user-info';
+    left.innerHTML = `<span>${username}</span><div class="user-meta">ثبت‌نام: ${new Date(u.registeredAt).toLocaleString('fa-IR')}</div><div class="user-meta status-label">${u.active === false ? 'غیرفعال' : 'فعال'}</div>`;
+    row.appendChild(left);
+
+    const actions = document.createElement('div');
+    actions.className = 'user-actions';
+
+    if (!u.approved) {
+      const approveBtn = document.createElement('button');
+      approveBtn.className = 'btn small';
+      approveBtn.textContent = 'تأیید';
+      approveBtn.onclick = () => withWaitCursor(async () => {
+        const saved = await saveDataWithRetries(currentData.version || 0, d => { if (d.users[username]) d.users[username].approved = true; });
+        currentData = saved; lastFileModified = null; lastKnownVersion = saved.version;
+        await refreshDataAndUI(); showAdminMessage(ERROR_MESSAGES.INFO_USER_APPROVED, 'success');
+      });
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn danger small';
+      delBtn.textContent = 'حذف';
+      delBtn.onclick = () => withWaitCursor(async () => {
+        if (!confirm('حذف کاربر؟')) return;
+        const saved = await saveDataWithRetries(currentData.version || 0, d => { delete d.users[username]; });
+        currentData = saved; lastFileModified = null; lastKnownVersion = saved.version;
+        await refreshDataAndUI(); showAdminMessage('کاربر حذف شد.', 'success');
+      });
+      actions.append(approveBtn, delBtn);
+      row.appendChild(actions);
+      pendingUsersList.appendChild(row);
+    } else {
+      const chPwd = document.createElement('button');
+      chPwd.className = 'btn small';
+      chPwd.textContent = 'تغییر رمز';
+      chPwd.onclick = () => withWaitCursor(async () => {
+        const np = prompt(`رمز جدید برای ${username}:`);
+        if (!np) return;
+        const hash = await sha256Hex(username + ':' + np);
+        const saved = await saveDataWithRetries(currentData.version || 0, d => { if (d.users[username]) d.users[username].hash = hash; });
+        currentData = saved; lastFileModified = null; lastKnownVersion = saved.version;
+        await refreshDataAndUI(); showAdminMessage('رمز تغییر کرد.', 'success');
+      });
+      const toggle = document.createElement('button');
+      toggle.className = 'btn small';
+      toggle.textContent = u.active === false ? 'فعال‌سازی' : 'غیرفعال‌سازی';
+      toggle.onclick = () => withWaitCursor(async () => {
+        const saved = await saveDataWithRetries(currentData.version || 0, d => { if (d.users[username]) d.users[username].active = !(d.users[username].active === false); });
+        currentData = saved; lastFileModified = null; lastKnownVersion = saved.version;
+        await refreshDataAndUI(); showAdminMessage(ERROR_MESSAGES.INFO_USER_TOGGLED, 'success');
+      });
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn danger small';
+      delBtn.textContent = 'حذف';
+      delBtn.onclick = () => withWaitCursor(async () => {
+        if (!confirm('حذف کاربر؟')) return;
+        const saved = await saveDataWithRetries(currentData.version || 0, d => { delete d.users[username]; });
+        currentData = saved; lastFileModified = null; lastKnownVersion = saved.version;
+        await refreshDataAndUI(); showAdminMessage('کاربر حذف شد.', 'success');
+      });
+      actions.append(chPwd, toggle, delBtn);
+      row.appendChild(actions);
+      approvedUsersList.appendChild(row);
+    }
+  });
+}
+
+async function handleAdminLogin() {
+  adminLoginMessage.textContent = '';
+  const pwd = adminPasswordInput.value;
+  if (!pwd) { adminLoginMessage.textContent = 'رمز مدیریت را وارد کنید.'; adminLoginMessage.className = 'message-area error'; return; }
+  const { data } = await readAndDecryptCurrent();
+  currentData = data;
+  if (!currentData.adminHash) {
+    const h = await sha256Hex(pwd);
+    await saveDataWithRetries(data.version || 0, d => { d.adminHash = h; });
+    adminAuthenticated = true;
+    adminLoginArea.classList.add('hidden');
+    adminPanel.classList.remove('hidden');
+    renderAdminLists();
+    adminLoginMessage.textContent = ERROR_MESSAGES.INFO_ADMIN_SET;
+    adminLoginMessage.className = 'message-area success';
+    return;
+  }
+  if (await sha256Hex(pwd) === currentData.adminHash) {
+    adminAuthenticated = true;
+    adminLoginArea.classList.add('hidden');
+    adminPanel.classList.remove('hidden');
+    renderAdminLists();
+    adminLoginMessage.textContent = 'ورود موفق.';
+    adminLoginMessage.className = 'message-area success';
+  } else {
+    adminLoginMessage.textContent = ERROR_MESSAGES.ERR_ADMIN_AUTH;
+    adminLoginMessage.className = 'message-area error';
+  }
+}
+
+async function handleDeleteRoom() {
+  if (!confirm('حذف اتاق؟')) return;
+  const newPwd = prompt('رمز جدید اتاق:');
+  if (!newPwd) return;
+  await withWaitCursor(async () => {
+    const raw = await readChatFileRaw();
+    const { content } = raw;
+    const sepIdx = content.indexOf(SALT_SEPARATOR);
+    const saltOld = content.slice(0, sepIdx);
+    const encOld = content.slice(sepIdx + 1);
+    const keyOld = await deriveKeyFromPassword(currentRoomPassword, saltOld);
+    const data = await decryptJson(keyOld, encOld);
+    data.messages = [];
+    data.roomResetAt = null;
+    data.version = (data.version || 0) + 1;
+    const saltNew = ab2base64(crypto.getRandomValues(new Uint8Array(16)).buffer);
+    const keyNew = await deriveKeyFromPassword(newPwd, saltNew);
+    await writeChatFileRaw(saltNew + SALT_SEPARATOR + await encryptJson(keyNew, data));
+    await removeUploadsDir();
+    showAdminMessage(ERROR_MESSAGES.INFO_ROOM_DELETED, 'success');
+    closeAdminModalFunc();
+    await clearRoomKeyCache();
+    performLogout('اتاق بازنشانی شد. با رمز جدید وارد شوید.');
+  });
+}
+
+async function handleChangeAdminPassword() {
+  const np = prompt('رمز جدید پنل:');
+  if (!np) return;
+  await withWaitCursor(async () => {
+    const h = await sha256Hex(np);
+    await saveDataWithRetries(currentData.version || 0, d => { d.adminHash = h; });
+    showAdminMessage('رمز پنل تغییر کرد.', 'success');
+  });
+}
+
+async function handleBackup() {
+  const raw = await readChatFileRaw();
+  if (!raw) return showAdminMessage('فایلی برای بکاپ وجود ندارد.', 'error');
+  const blob = new Blob([raw.content], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'chatroom_backup.dat';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+  showAdminMessage('بکاپ با موفقیت دانلود شد.', 'success');
+}
+
+/* ---------- تم ---------- */
+async function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  themeToggleBtn.textContent = next === 'dark' ? '☀️' : '🌙';
+  try {
+    await saveDataWithRetries(currentData.version || 0, d => { if (d.users && d.users[currentUsername]) d.users[currentUsername].theme = next; });
+    await refreshDataAndUI();
+  } catch(e) {
+    document.documentElement.setAttribute('data-theme', cur);
+    themeToggleBtn.textContent = cur === 'dark' ? '☀️' : '🌙';
+    alert('خطا در تغییر تم.');
+  }
+}
+
+/* ---------- رویدادها ---------- */
+selectFolderBtn.addEventListener('click', async () => {
+  try {
+    const h = await window.showDirectoryPicker();
+    if ((await h.requestPermission({ mode: 'readwrite' })) !== 'granted') { showLoginMessage(ERROR_MESSAGES.ERR_PERMISSION_DENIED, 'error'); return; }
+    directoryHandle = h;
+    await saveDirectoryHandleToIdb(h);
+    showLoginMessage('پوشه اشتراکی انتخاب و ذخیره شد.', 'success');
+  } catch(e) { showLoginMessage('انتخاب پوشه لغو شد.', 'error'); }
+});
+
+loginBtn.addEventListener('click', handleLogin);
+[roomPasswordInput, usernameInput, personalPasswordInput].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); loginBtn.click(); } }));
+
+toggleRoomPwd.onclick = () => roomPasswordInput.type = roomPasswordInput.type === 'password' ? 'text' : 'password';
+togglePersonalPwd.onclick = () => personalPasswordInput.type = personalPasswordInput.type === 'password' ? 'text' : 'password';
+
+messageForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  await sendMessage(messageInput.value);
+  messageInput.value = '';
+});
+messageInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
+
+const EMOJIS = ['😀','😃','😄','😁','😅','😂','🙂','🙃','😉','😊','😍','😘','😎','🤔','😴','😢','😡','👍','🙏','🎉'];
+function buildEmojiPicker() {
+  emojiPicker.innerHTML = '';
+  EMOJIS.forEach(em => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'emoji-item'; b.textContent = em;
+    b.onclick = () => {
+      const s = messageInput.selectionStart || 0;
+      messageInput.value = messageInput.value.slice(0, s) + em + messageInput.value.slice(s);
+      messageInput.focus(); messageInput.setSelectionRange(s + em.length, s + em.length);
+    };
+    emojiPicker.appendChild(b);
+  });
+}
+buildEmojiPicker();
+emojiBtn.onclick = () => {
+  const hidden = emojiPicker.classList.toggle('hidden');
+  emojiPicker.setAttribute('aria-hidden', String(hidden));
+};
+document.addEventListener('click', e => { if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) { emojiPicker.classList.add('hidden'); emojiPicker.setAttribute('aria-hidden', 'true'); } });
+
+attachBtn.onclick = () => fileInput.click();
+fileInput.onchange = async () => { if (fileInput.files[0]) await uploadFile(fileInput.files[0]); fileInput.value = ''; };
+
+['dragenter','dragover'].forEach(ev => messageForm.addEventListener(ev, e => { e.preventDefault(); messageForm.classList.add('dragover'); }));
+['dragleave','drop'].forEach(ev => messageForm.addEventListener(ev, e => { e.preventDefault(); messageForm.classList.remove('dragover'); }));
+messageForm.addEventListener('drop', async e => {
+  e.preventDefault();
+  if (e.dataTransfer.files[0]) await uploadFile(e.dataTransfer.files[0]);
+});
+
+closeAdminModal.addEventListener('click', closeAdminModalFunc);
+modalBackdrop.addEventListener('click', closeAdminModalFunc);
+adminLoginBtn.addEventListener('click', () => withWaitCursor(handleAdminLogin));
+deleteRoomBtn.addEventListener('click', () => withWaitCursor(handleDeleteRoom));
+changeAdminPwdBtn.addEventListener('click', () => withWaitCursor(handleChangeAdminPassword));
+backupBtn.addEventListener('click', () => withWaitCursor(handleBackup));
+
+adminPasswordInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); adminLoginBtn.click(); } });
+
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyQ') {
+    e.preventDefault();
+    if (adminModal.classList.contains('hidden')) openAdminModal(); else closeAdminModalFunc();
+  }
+});
+
+logoutBtn.addEventListener('click', () => performLogout('شما خارج شدید.'));
+themeToggleBtn.addEventListener('click', toggleTheme);
+
+changePwdBtn.addEventListener('click', async () => {
+  const oldPwd = prompt('رمز فعلی:');
+  if (!oldPwd) return;
+  if (await sha256Hex(currentUsername + ':' + oldPwd) !== currentData.users[currentUsername].hash) { alert('رمز نادرست.'); return; }
+  const newPwd = prompt('رمز جدید:');
+  if (!newPwd) return;
+  const newHash = await sha256Hex(currentUsername + ':' + newPwd);
+  await saveDataWithRetries(currentData.version || 0, d => { d.users[currentUsername].hash = newHash; });
+  currentPersonalPassword = newPwd;
+  saveSession();
+  alert('رمز تغییر کرد.');
+});
+
+/* session */
+function saveSession() {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ username: currentUsername, personalPassword: currentPersonalPassword, roomPassword: currentRoomPassword }));
+}
+function clearSession() { sessionStorage.removeItem(SESSION_KEY); }
+function loadSession() { const raw = sessionStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; }
+
+/* init */
+(async function init() {
+  try {
+    const saved = await getDirectoryHandleFromIdb();
+    if (saved) {
+      try {
+        if ((await saved.requestPermission({ mode: 'readwrite' })) === 'granted') {
+          directoryHandle = saved;
+          showLoginMessage('پوشه اشتراکی آماده است.', 'info');
+        } else showLoginMessage('پوشه قبلی مجوز ندارد. دوباره انتخاب کنید.', 'info');
+      } catch(e) { showLoginMessage('پوشه قبلی مجوز ندارد.', 'info'); }
+    } else showLoginMessage('لطفاً پوشه اشتراکی را انتخاب کنید.', 'info');
+  } catch(e) { showLoginMessage('خطا در بازیابی پوشه.', 'error'); }
+
+  const sess = loadSession();
+  if (sess && sess.roomPassword && sess.username && sess.personalPassword && directoryHandle) {
+    try {
+      currentRoomPassword = sess.roomPassword;
+      currentUsername = sess.username;
+      currentPersonalPassword = sess.personalPassword;
+      currentUserDisplay.textContent = sess.username;
+      const { data, key, saltBase64 } = await loadDataWithPassword(sess.roomPassword);
+      currentData = data; currentKey = key; currentSalt = saltBase64;
+      if (data.users[sess.username]?.active === false) { clearSession(); showLoginMessage(ERROR_MESSAGES.ERR_USER_INACTIVE, 'error'); return; }
+      applyUserTheme(data.users[sess.username]?.theme || 'light');
+      openChatScreen();
+    } catch(e) { clearSession(); showLoginMessage('جلسه قبلی منقضی شد.', 'info'); }
+  }
+})();
+
+window.addEventListener('beforeunload', () => { if (pollTimer) clearInterval(pollTimer); });
+
+/* تولتیپ */
+designerNote.addEventListener('mouseenter', () => designerTooltip.style.opacity = '1');
+designerNote.addEventListener('mouseleave', () => designerTooltip.style.opacity = '0');
+designerNote.addEventListener('focus', () => designerTooltip.style.opacity = '1');
+designerNote.addEventListener('blur', () => designerTooltip.style.opacity = '0');
+  </script>
+</body>
+</html>
